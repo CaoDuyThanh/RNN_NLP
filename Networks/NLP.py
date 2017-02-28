@@ -1,14 +1,17 @@
+import os.path
 from Utils.DataHelper import *
+from RNN import *
 
 DATASET_NAME = '../Dataset/reddit-comments-2015-08.csv'
 SAVE_PATH = '../Pretrained/model.pkl'
 
 # Hyper parameters
 VOCABULARY_SIZE = 8000
+NUM_HIDDEN = 500
+TRUNCATE = 5
 UNKNOWN_TOKEN = 'UNKNOWN_TOKEN'
 LEARNING_RATE = 0.005
 NUM_EPOCH = 1500
-BATCH_SIZE = 50
 PATIENCE = 1000
 PATIENCE_INCREASE = 2
 IMPROVEMENT_THRESHOLD = 0.995
@@ -49,9 +52,92 @@ def NLP():
     #        BUILD MODEL        #
     #############################
 
+    X = T.matrix('X', dtype = theano.config.floatX)
+    Y = T.ivector('Y')
+    Index = T.iscalar('Index')
 
+    X = X.reshape((VOCABULARY_SIZE, TRUNCATE))
+    rng = numpy.random.RandomState(123)
+    rnnModel = RNN(
+        rng = rng,
+        input = X,
+        numIn = VOCABULARY_SIZE,
+        numHidden = NUM_HIDDEN,
+        truncate = TRUNCATE,
+        useSoftmax = True,
+    )
+    rnnModelOutput = rnnModel.Output()
 
-    return 0
+    # Create functions
+    trainModel = theano.function(
+        inputs = [Index],
+        outputs = [costFunction],
+        updates = udpates,
+        givens = {
+            X:,
+            Y:
+        }
+    )
+
+    validModel = theano.function(
+        inputs = [Index],
+        outputs = [costFunction],
+        givens = {
+            X:,
+            Y:
+        }
+    )
+
+    testModel = theano.function(
+        inputs = [Index],
+        outputs = [costFunction],
+        givens = {
+            X:,
+            Y:
+        }
+    )
+
+    # Train model - using early stopping
+    # Load old model if exist
+    if os.path.isfile(SAVE_PATH):
+        print ('Load old model and continue the training')
+        rnnModel.LoadModel(SAVE_PATH)
+
+    # Gradient descent - early stopping
+    epoch = 0
+    iter = 0
+    patient = PATIENCE
+    doneLooping = False
+    bestCost = 10000
+    while (epoch < NUM_EPOCH) and (not doneLooping):
+        epoch += 1
+
+        # Travel through the training set
+        for ind in range(100):
+            iter += 1
+
+            # Calculate cost of trainModel
+            cost = trainModel(ind)
+
+            # Calculate cost of validation set every VALIDATION_FREQUENCY iter
+            if iter % VALIDATION_FREQUENCY == 0:
+                costValid = validModel(ind)
+
+                if costValid < bestCost:
+                    bestCost = costValid
+                    rnnModel.SaveModel(SAVE_PATH)
+
+        if patient < iter:
+            doneLooping = True
+            break
+
+    # Load model and test
+    if os.path.isfile(SAVE_PATH):
+        print ('Can not find old model !')
+        rnnModel.LoadModel(SAVE_PATH)
+
+    costTest = testModel(0)
+    print ('Cost of test model : ', costTest)
 
 if __name__ == '__main__':
     NLP()
