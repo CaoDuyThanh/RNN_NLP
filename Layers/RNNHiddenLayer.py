@@ -12,17 +12,23 @@ class RNNHiddenLayer:
                  whh = None,
                  wx = None,
                  wy = None,
-                 skm1 = None,
                  activation = T.tanh):
         # Set parameters
         self.Rng = rng
         self.NumIn = numIn
         self.NumHidden = numHidden
+        self.Whh = whh
+        self.Wx = wx
+        self.Wy = wy
         self.Activation = activation
 
-        if whh is None:
+        self.createHiddenLayer()
+        self.buildHiddenLayer()
+
+    def createHiddenLayer(self):
+        if self.Whh is None:
             self.Whh = theano.shared(
-                numpy.asarray(rng.uniform(
+                numpy.asarray(self.Rng.uniform(
                         low = -1.0,
                         high = 1.0,
                         size = (self.NumHidden, self.NumHidden)
@@ -31,12 +37,10 @@ class RNNHiddenLayer:
                 ),
                 borrow = True
             )
-        else:
-            self.Whh = whh;
 
-        if wx is None:
+        if self.Wx is None:
             self.Wx = theano.shared(
-                numpy.asarray(rng.uniform(
+                numpy.asarray(self.Rng.uniform(
                     low = -1.0,
                     high = 1.0,
                     size = (self.NumIn, self.NumHidden)
@@ -45,12 +49,10 @@ class RNNHiddenLayer:
                 ),
                 borrow = True
             )
-        else:
-            self.Wx = wx
 
-        if wy is None:
+        if self.Wy is None:
             self.Wy = theano.shared(
-                numpy.asarray(rng.uniform(
+                numpy.asarray(self.Rng.uniform(
                     low = -1.0,
                     high = 1.0,
                     size = (self.NumHidden, self.NumIn)
@@ -59,39 +61,14 @@ class RNNHiddenLayer:
                 ),
                 borrow = True
             )
-        else:
-            self.Wy = wy
 
-        if skm1 is None:
-            self.Skm1 = theano.shared(
-                numpy.zeros(
-                    shape = (self.NumHidden),
-                    dtype=theano.config.floatX
-                ),
-                borrow=True
-            )
-        else:
-            self.Skm1 = skm1
+    def buildHiddenLayer(self):
+        self.Params = [self.Whh, self.Wx, self.Wy]
 
-    def Output(self):
-        return 0
-
-    def Params(self):
-        return [self.Whh,
-                self.Wx,
-                self.Wy]
-
-    def Y(self, Xk):
-        s = self.S(Xk)
-        y = s * self.Wy
+    def FeedForward(self, Skm1, Xk):
+        S = T.dot(Xk, self.Wx) + T.dot(Skm1, self.Whh)
+        Y = T.dot(S, self.Wy)
         if self.Activation is None:
-            return y
+            return [S, Y]
         else:
-            return self.Activation(y)
-
-    def S(self, Xk):
-        s = T.dot(self.Skm1, self.hh) + T.dot(self.Wx, Xk)
-        if self.Activation is None:
-            return s
-        else:
-            return self.Activation(s)
+            return [self.Activation(S), self.Activation(Y)]
