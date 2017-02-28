@@ -2,23 +2,21 @@ import os.path
 from Utils.DataHelper import *
 from RNN import *
 
-DATASET_NAME = '../Dataset/reddit-comments-2015-08.csv'
+DATASET_NAME = '../Data/reddit-comments-2015-08.csv'
+# DATASET_NAME = '../Data/minidata.csv'
 SAVE_PATH = '../Pretrained/model.pkl'
 
 # Hyper parameters
 VOCABULARY_SIZE = 8000
-NUM_HIDDEN = 500
-TRUNCATE = 5
+NUM_HIDDEN = 80
+TRUNCATE = 4
 UNKNOWN_TOKEN = 'UNKNOWN_TOKEN'
 LEARNING_RATE = 0.005
-NUM_EPOCH = 1500
+NUM_EPOCH = 200
 PATIENCE = 1000
 PATIENCE_INCREASE = 2
 IMPROVEMENT_THRESHOLD = 0.995
 VALIDATION_FREQUENCY = 1000
-VISUALIZE_FREQUENCY = 5000
-
-
 
 def NLP():
     # Load datasets from local disk reddit-comments-2015-08.csv
@@ -43,58 +41,25 @@ def NLP():
 
     # Replace all words not in our vocabulary with the unknown token
     for i, sent in enumerate(tokenized):
-        tokenized[i] = [w if w in wordToIndex else UNKNOWN_TOKEN]
+        tokenized[i] = [w if w in wordToIndex else UNKNOWN_TOKEN for w in sent]
 
     print ('Example sentence: ', sentences[0])
     print ('Example sentence after preprocessing: ', tokenized[0])
 
+    # Create training dataset
+    trainDatasetX = numpy.asarray([[wordToIndex[w] for w in sent[:-1]] for sent in tokenized])
+    trainDatasetY = numpy.asarray([[wordToIndex[w] for w in sent[1:]] for sent in tokenized])
+
     #############################
     #        BUILD MODEL        #
     #############################
-
-    X = T.matrix('X', dtype = theano.config.floatX)
-    Y = T.ivector('Y')
-    Index = T.iscalar('Index')
-
-    X = X.reshape((VOCABULARY_SIZE, TRUNCATE))
     rng = numpy.random.RandomState(123)
     rnnModel = RNN(
         rng = rng,
-        input = X,
         numIn = VOCABULARY_SIZE,
         numHidden = NUM_HIDDEN,
         truncate = TRUNCATE,
         useSoftmax = True,
-    )
-    rnnModelOutput = rnnModel.Output()
-
-    # Create functions
-    trainModel = theano.function(
-        inputs = [Index],
-        outputs = [costFunction],
-        updates = udpates,
-        givens = {
-            X:,
-            Y:
-        }
-    )
-
-    validModel = theano.function(
-        inputs = [Index],
-        outputs = [costFunction],
-        givens = {
-            X:,
-            Y:
-        }
-    )
-
-    testModel = theano.function(
-        inputs = [Index],
-        outputs = [costFunction],
-        givens = {
-            X:,
-            Y:
-        }
     )
 
     # Train model - using early stopping
@@ -113,19 +78,26 @@ def NLP():
         epoch += 1
 
         # Travel through the training set
-        for ind in range(100):
+        for sent in trainDatasetX:
             iter += 1
 
             # Calculate cost of trainModel
-            cost = trainModel(ind)
+            for idx in range(len(sent) - TRUNCATE):
+                XTrain = numpy.zeros((TRUNCATE, VOCABULARY_SIZE), dtype = theano.config.floatX)
+                XTrain[range(TRUNCATE), sent[idx:idx + TRUNCATE]] = 1
+                YTrain = numpy.zeros((1, VOCABULARY_SIZE), dtype = theano.config.floatX)
+                YTrain[0, sent[idx + TRUNCATE]] = 1
+                cost = rnnModel.TrainModel(XTrain, YTrain)
+
+            print cost
 
             # Calculate cost of validation set every VALIDATION_FREQUENCY iter
-            if iter % VALIDATION_FREQUENCY == 0:
-                costValid = validModel(ind)
-
-                if costValid < bestCost:
-                    bestCost = costValid
-                    rnnModel.SaveModel(SAVE_PATH)
+            # if iter % VALIDATION_FREQUENCY == 0:
+            #     costValid = validModel(ind)
+            #
+            #     if costValid < bestCost:
+            #         bestCost = costValid
+            #         rnnModel.SaveModel(SAVE_PATH)
 
         if patient < iter:
             doneLooping = True
@@ -136,8 +108,8 @@ def NLP():
         print ('Can not find old model !')
         rnnModel.LoadModel(SAVE_PATH)
 
-    costTest = testModel(0)
-    print ('Cost of test model : ', costTest)
+
+    # print ('Cost of test model : ', costTest)
 
 if __name__ == '__main__':
     NLP()
