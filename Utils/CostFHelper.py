@@ -1,6 +1,5 @@
 import theano
 import theano.tensor as T
-import numpy
 
 """ L1 - Regularization """
 def L1(W):
@@ -15,6 +14,9 @@ def CrossEntropy(output, y):
     # return T.mean(T.sum(T.nnet.binary_crossentropy(output, y), 1))
     return -T.mean(T.log(output)[T.arange(y.shape[0]), y])
 
+""" Category entropy """
+def CategoryEntropy(output, y):
+    return T.sum(T.nnet.categorical_crossentropy(output, y))
 
 """ Error """
 def Error(output, y):
