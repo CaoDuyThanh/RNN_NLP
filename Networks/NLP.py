@@ -16,7 +16,30 @@ NUM_EPOCH = 200
 PATIENCE = 1000
 PATIENCE_INCREASE = 2
 IMPROVEMENT_THRESHOLD = 0.995
-VALIDATION_FREQUENCY = 1000
+VALIDATION_FREQUENCY = 100000
+
+PERCENT_TRAIN = 0.70
+PERCENT_VALID = 0.10
+PERCENT_TEST = 0.20
+
+
+def testModel(rnnModel, validDatasetX):
+    count = 0
+    cost = 0
+    for sent in validDatasetX:
+        # Calculate cost of trainModel
+        for idx in range(len(sent) - TRUNCATE):
+            count += 1
+            XTrain = numpy.zeros((TRUNCATE, VOCABULARY_SIZE), dtype=theano.config.floatX)
+            XTrain[range(TRUNCATE), sent[idx:idx + TRUNCATE]] = 1
+            YTrain = numpy.zeros((1, VOCABULARY_SIZE), dtype=theano.config.floatX)
+            YTrain[0, sent[idx + TRUNCATE]] = 1
+            cost += rnnModel.TestModel(XTrain, YTrain)
+
+    return cost / count
+
+
+
 
 def NLP():
     # Load datasets from local disk reddit-comments-2015-08.csv
@@ -47,8 +70,11 @@ def NLP():
     print ('Example sentence after preprocessing: ', tokenized[0])
 
     # Create training dataset
-    trainDatasetX = numpy.asarray([[wordToIndex[w] for w in sent[:-1]] for sent in tokenized])
-    trainDatasetY = numpy.asarray([[wordToIndex[w] for w in sent[1:]] for sent in tokenized])
+    numSamples = len(tokenized)
+    sliceIndex = numpy.array([0, numSamples * PERCENT_TRAIN, numSamples * (PERCENT_TRAIN + PERCENT_VALID), numSamples], dtype = 'int32')
+    trainDatasetX = numpy.asarray([[wordToIndex[w] for w in sent[:-1]] for sent in tokenized[sliceIndex[0]:sliceIndex[1]]])
+    validDatasetX = numpy.asarray([[wordToIndex[w] for w in sent[1:]] for sent in tokenized[sliceIndex[1]:sliceIndex[2]]])
+    testDatasetX = numpy.asarray([[wordToIndex[w] for w in sent[1:]] for sent in tokenized[sliceIndex[2]:sliceIndex[3]]])
 
     #############################
     #        BUILD MODEL        #
@@ -79,25 +105,27 @@ def NLP():
 
         # Travel through the training set
         for sent in trainDatasetX:
-            iter += 1
-
             # Calculate cost of trainModel
             for idx in range(len(sent) - TRUNCATE):
+                iter += 1
                 XTrain = numpy.zeros((TRUNCATE, VOCABULARY_SIZE), dtype = theano.config.floatX)
                 XTrain[range(TRUNCATE), sent[idx:idx + TRUNCATE]] = 1
                 YTrain = numpy.zeros((1, VOCABULARY_SIZE), dtype = theano.config.floatX)
                 YTrain[0, sent[idx + TRUNCATE]] = 1
                 cost = rnnModel.TrainModel(XTrain, YTrain)
 
-            print cost
+                # Calculate cost of validation set every VALIDATION_FREQUENCY iter
+                if iter % VALIDATION_FREQUENCY == 0:
+                    # Calculate cost of validModel
+                    costValid = testModel(rnnModel, validDatasetX)
 
-            # Calculate cost of validation set every VALIDATION_FREQUENCY iter
-            # if iter % VALIDATION_FREQUENCY == 0:
-            #     costValid = validModel(ind)
-            #
-            #     if costValid < bestCost:
-            #         bestCost = costValid
-            #         rnnModel.SaveModel(SAVE_PATH)
+                    if costValid < bestCost:
+                        print ('Save model ! Valid cost = ', costValid)
+                        bestCost = costValid
+                        rnnModel.SaveModel(SAVE_PATH)
+
+                if (iter % 5000 == 0):
+                    print ('Epoch = %d, iteration =  %d, cost = %f ' % (epoch, iter, cost))
 
         if patient < iter:
             doneLooping = True
@@ -105,8 +133,12 @@ def NLP():
 
     # Load model and test
     if os.path.isfile(SAVE_PATH):
-        print ('Can not find old model !')
         rnnModel.LoadModel(SAVE_PATH)
+        costTest = testModel(rnnModel, testDatasetX)
+        print ('Cost of test dataset = ', costTest)
+    else:
+        print ('Can not find old model !')
+
 
 
     # print ('Cost of test model : ', costTest)
