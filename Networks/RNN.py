@@ -89,11 +89,10 @@ class RNN:
         )
 
         # Create test model
-        # self.TestModel = theano.function(
-        #     inputs=[X, Y],
-        #     outputs=rnnModel.Cost(Y),
-        #     updates=rnnModel.Updates()
-        # )
+        self.TestModel = theano.function(
+            inputs = [X, Y],
+            outputs = cost
+        )
 
     def Output(self):
         output = self.Layers[-1].Output
@@ -108,7 +107,7 @@ class RNN:
 
 
     def LoadModel(self, fileName):
-        file = open(fileName, 'r')
+        file = open(fileName)
         self.Whh.set_value(cPickle.load(file), borrow = True)
         self.Whh.set_value(cPickle.load(file), borrow=True)
         self.Whh.set_value(cPickle.load(file), borrow=True)
