@@ -38,9 +38,6 @@ def testModel(rnnModel, validDatasetX):
 
     return cost / count
 
-
-
-
 def NLP():
     # Load datasets from local disk reddit-comments-2015-08.csv
     sentences = LoadData(DATASET_NAME)
@@ -127,9 +124,6 @@ def NLP():
                 if (iter % 5000 == 0):
                     print ('Epoch = %d, iteration =  %d, cost = %f ' % (epoch, iter, cost))
 
-        if patient < iter:
-            doneLooping = True
-            break
 
     # Load model and test
     if os.path.isfile(SAVE_PATH):
