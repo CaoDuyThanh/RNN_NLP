@@ -66,9 +66,7 @@ class RNNHiddenLayer:
         self.Params = [self.Whh, self.Wx, self.Wy]
 
     def FeedForward(self, Skm1, Xk):
-        S = T.dot(Xk, self.Wx) + T.dot(Skm1, self.Whh)
+        S = self.Activation(T.dot(Xk, self.Wx) + T.dot(Skm1, self.Whh))
         Y = T.dot(S, self.Wy)
-        if self.Activation is None:
-            return [S, Y]
-        else:
-            return [self.Activation(S), self.Activation(Y)]
+        return [S, Y]
+
