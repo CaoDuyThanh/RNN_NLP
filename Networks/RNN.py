@@ -81,7 +81,6 @@ class RNN:
         grads = T.grad(cost, params)
         updates = [(param, param - self.LearningRate * grad)
                    for (param, grad) in zip(params, grads)]
-
         self.TrainModel = theano.function(
             inputs = [X, Y],
             outputs = cost,
@@ -94,23 +93,11 @@ class RNN:
             outputs = cost
         )
 
-    def Output(self):
-        output = self.Layers[-1].Output
-        if self.UseSoftmax is False:
-            return output
-        else:
-            softmaxLayer = SoftmaxLayer(
-                input = output
-            )
-            return softmaxLayer.Output()
-
-
-
     def LoadModel(self, fileName):
         file = open(fileName)
         self.Whh.set_value(cPickle.load(file), borrow = True)
-        self.Whh.set_value(cPickle.load(file), borrow=True)
-        self.Whh.set_value(cPickle.load(file), borrow=True)
+        self.Wx.set_value(cPickle.load(file), borrow=True)
+        self.Wy.set_value(cPickle.load(file), borrow=True)
         file.close()
 
     def SaveModel(self, fileName):
