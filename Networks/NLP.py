@@ -6,7 +6,7 @@ DATASET_NAME = '../Data/reddit-comments-2015-08.csv'
 # DATASET_NAME = '../Data/minidata.csv'
 SAVE_PATH = '../Pretrained/model.pkl'
 
-# Hyper parameters
+# TRAINING PARAMETERS
 VOCABULARY_SIZE = 8000
 NUM_HIDDEN = 80
 TRUNCATE = 4
@@ -16,27 +16,30 @@ NUM_EPOCH = 200
 PATIENCE = 1000
 PATIENCE_INCREASE = 2
 IMPROVEMENT_THRESHOLD = 0.995
-VALIDATION_FREQUENCY = 100000
 
-PERCENT_TRAIN = 0.70
-PERCENT_VALID = 0.10
-PERCENT_TEST = 0.20
+VISUALIZE_FREQUENCY = 1000
+VALIDATION_FREQUENCY = 300000
+
+PERCENT_TRAIN = 0.80
+PERCENT_VALID = 0.05
+PERCENT_TEST  = 0.15
 
 
 def testModel(rnnModel, validDatasetX):
-    count = 0
+    print ('Validate model...')
+    iter = 0
     cost = 0
     for sent in validDatasetX:
         # Calculate cost of trainModel
         for idx in range(len(sent) - TRUNCATE):
-            count += 1
-            XTrain = numpy.zeros((TRUNCATE, VOCABULARY_SIZE), dtype=theano.config.floatX)
-            XTrain[range(TRUNCATE), sent[idx:idx + TRUNCATE]] = 1
-            YTrain = numpy.zeros((1, VOCABULARY_SIZE), dtype=theano.config.floatX)
-            YTrain[0, sent[idx + TRUNCATE]] = 1
-            cost += rnnModel.TestModel(XTrain, YTrain)
+            iter += 1
+            XTrain = sent[idx : idx + TRUNCATE]
+            YTrain = sent[idx + TRUNCATE : idx + TRUNCATE + 1]
+            cost += rnnModel.TestFunc(XTrain, YTrain)
 
-    return cost / count
+            if (iter % VISUALIZE_FREQUENCY == 0):
+                print ('     Iteration =  %d, cost = %f ' % (iter, cost))
+    return cost / iter
 
 def NLP():
     # Load datasets from local disk reddit-comments-2015-08.csv
@@ -78,11 +81,10 @@ def NLP():
     #############################
     rng = numpy.random.RandomState(123)
     rnnModel = RNN(
-        rng = rng,
-        numIn = VOCABULARY_SIZE,
+        rng       = rng,
+        numIn     = VOCABULARY_SIZE,
         numHidden = NUM_HIDDEN,
-        truncate = TRUNCATE,
-        useSoftmax = True,
+        truncate  = TRUNCATE
     )
 
     # Train model - using early stopping
@@ -97,6 +99,7 @@ def NLP():
     patient = PATIENCE
     doneLooping = False
     bestCost = 10000
+    trainCost = []
     while (epoch < NUM_EPOCH) and (not doneLooping):
         epoch += 1
 
@@ -105,11 +108,10 @@ def NLP():
             # Calculate cost of trainModel
             for idx in range(len(sent) - TRUNCATE):
                 iter += 1
-                XTrain = numpy.zeros((TRUNCATE, VOCABULARY_SIZE), dtype = theano.config.floatX)
-                XTrain[range(TRUNCATE), sent[idx:idx + TRUNCATE]] = 1
-                YTrain = numpy.zeros((1, VOCABULARY_SIZE), dtype = theano.config.floatX)
-                YTrain[0, sent[idx + TRUNCATE]] = 1
-                cost = rnnModel.TrainModel(XTrain, YTrain)
+                XTrain = sent[idx : idx + TRUNCATE]
+                YTrain = sent[idx + TRUNCATE : idx + TRUNCATE + 1]
+                cost = rnnModel.TrainFunc(XTrain, YTrain)
+                trainCost.append(cost)
 
                 # Calculate cost of validation set every VALIDATION_FREQUENCY iter
                 if iter % VALIDATION_FREQUENCY == 0:
@@ -121,8 +123,9 @@ def NLP():
                         bestCost = costValid
                         rnnModel.SaveModel(SAVE_PATH)
 
-                if (iter % 5000 == 0):
-                    print ('Epoch = %d, iteration =  %d, cost = %f ' % (epoch, iter, cost))
+                if (iter % VISUALIZE_FREQUENCY == 0):
+                    print ('Epoch = %d, iteration =  %d, cost = %f ' % (epoch, iter, numpy.mean(trainCost)))
+                    trainCost = []
 
 
     # Load model and test
@@ -132,8 +135,6 @@ def NLP():
         print ('Cost of test dataset = ', costTest)
     else:
         print ('Can not find old model !')
-
-
 
     # print ('Cost of test model : ', costTest)
 
